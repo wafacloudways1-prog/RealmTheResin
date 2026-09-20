@@ -1,6 +1,21 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Orders</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body><header><div class="logo">RealmTheResin</div><a href="index.html">Shop</a></header><main class="shop"><h1>My Orders</h1><div id="orders"></div></main><script src="config.js"></script><script>
-const c=window.supabase.createClient(APP_CONFIG.SUPABASE_URL,APP_CONFIG.SUPABASE_PUBLISHABLE_KEY);
-(async()=>{let {data:{session}}=await c.auth.getSession();if(!session){orders.innerHTML="<p>Please sign in with Google first.</p>";return}
-let {data,error}=await c.from("orders").select("*").order("created_at",{ascending:false});if(error){orders.textContent=error.message;return}
-orders.innerHTML=data.map(o=>`<div class="product" style="max-width:700px;margin:15px auto;text-align:left"><h3>Order ${o.id.slice(0,8)}</h3><p>Status: <b>${o.status}</b></p><p>Payment: ${o.payment_status}</p><p>Total: ₹${o.total}</p><p>Expected delivery: ${o.delivery_date||"Not set yet"}</p></div>`).join("")||"<p>No orders yet.</p>"})()
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Orders</title><link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body>
+<header><div class="logo">RealmTheResin</div><a href="index.html">Shop</a></header>
+<main class="shop"><h1>My Orders</h1><div id="orders"></div></main>
+<script src="config.js"></script><script>
+const ordersEl = document.getElementById("orders");
+if (!window.supabaseClient) {
+  ordersEl.innerHTML = "<p>Orders will appear here after Supabase is connected.</p>";
+} else {
+  (async()=>{
+    const {data:{session}}=await window.supabaseClient.auth.getSession();
+    if(!session){ordersEl.innerHTML="<p>Please sign in with Google first.</p>";return}
+    const {data,error}=await window.supabaseClient.from("orders").select("*").order("created_at",{ascending:false});
+    if(error){ordersEl.textContent=error.message;return}
+    ordersEl.innerHTML=data.map(o=>`<div class="product" style="max-width:700px;margin:15px auto;text-align:left"><h3>Order ${o.id.slice(0,8)}</h3><p>Status: <b>${o.status}</b></p><p>Payment: ${o.payment_status}</p><p>Total: ₹${o.total}</p><p>Expected delivery: ${o.delivery_date||"Not set yet"}</p></div>`).join("")||"<p>No orders yet.</p>";
+  })();
+}
 </script></body></html>

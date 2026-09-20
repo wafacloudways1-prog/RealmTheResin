@@ -1,8 +1,31 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin | RealmTheResin</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body><header><div class="logo">RealmTheResin Admin</div><a href="index.html">Store</a></header><main class="shop"><h1>Orders</h1><div id="admin"></div></main><script src="config.js"></script><script>
-const c=window.supabase.createClient(APP_CONFIG.SUPABASE_URL,APP_CONFIG.SUPABASE_PUBLISHABLE_KEY);
-async function load(){let {data:{session}}=await c.auth.getSession();if(!session){admin.innerHTML="<p>Sign in first.</p>";return}
-let {data:profile}=await c.from("profiles").select("role").eq("id",session.user.id).single();if(profile?.role!=="admin"){admin.innerHTML="<p>Admin access required.</p>";return}
-let {data,error}=await c.from("orders").select("*").order("created_at",{ascending:false});if(error){admin.textContent=error.message;return}
-admin.innerHTML=data.map(o=>`<div class="product" style="max-width:850px;margin:15px auto;text-align:left"><h3>${o.id}</h3><p>${o.customer_name} • ${o.phone}</p><p>${o.address}, ${o.city} - ${o.pin}</p><p>Total ₹${o.total} • Payment ${o.payment_status}</p><p>Status: ${o.status} • Delivery: ${o.delivery_date||"not set"}</p><button onclick="updateStatus('${o.id}')">Update</button></div>`).join("")}
-async function updateStatus(id){let s=prompt("New status: processing / shipped / delivered / cancelled");if(!s)return;let d=prompt("Delivery date YYYY-MM-DD (optional)");const {data,error}=await c.functions.invoke("update-order-status",{body:{order_id:id,status:s,delivery_date:d||null}});if(error)alert(error.message);else load()}load();
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin | RealmTheResin</title><link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body>
+<header><div class="logo">RealmTheResin Admin</div><a href="index.html">Store</a></header>
+<main class="shop"><h1>Orders</h1><div id="admin"></div></main>
+<script src="config.js"></script><script>
+const adminEl=document.getElementById("admin");
+if(!window.supabaseClient){
+  adminEl.innerHTML="<p>Admin tools will be available after Supabase is connected.</p>";
+}else{
+  const c=window.supabaseClient;
+  async function load(){
+    const {data:{session}}=await c.auth.getSession();
+    if(!session){adminEl.innerHTML="<p>Sign in first.</p>";return}
+    const {data:profile}=await c.from("profiles").select("role").eq("id",session.user.id).single();
+    if(profile?.role!=="admin"){adminEl.innerHTML="<p>Admin access required.</p>";return}
+    const {data,error}=await c.from("orders").select("*").order("created_at",{ascending:false});
+    if(error){adminEl.textContent=error.message;return}
+    adminEl.innerHTML=data.map(o=>`<div class="product" style="max-width:850px;margin:15px auto;text-align:left"><h3>${o.id}</h3><p>${o.customer_name} • ${o.phone}</p><p>${o.address}, ${o.city} - ${o.pin}</p><p>Total ₹${o.total} • Payment ${o.payment_status}</p><p>Status: ${o.status} • Delivery: ${o.delivery_date||"not set"}</p><button onclick="updateStatus('${o.id}')">Update</button></div>`).join("")}
+  async function updateStatus(id){
+    let s=prompt("New status: processing / shipped / delivered / cancelled"); if(!s)return;
+    let d=prompt("Delivery date YYYY-MM-DD (optional)");
+    const {error}=await c.functions.invoke("update-order-status",{body:{order_id:id,status:s,delivery_date:d||null}});
+    if(error)alert(error.message); else load();
+  }
+  window.updateStatus=updateStatus;
+  load();
+}
 </script></body></html>
