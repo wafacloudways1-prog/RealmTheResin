@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Checkout | RealmTheResin</title><link rel="stylesheet" href="style.css"><script src="https://checkout.razorpay.com/v1/checkout.js"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head><body>
+<header><div class="logo">RealmTheResin</div><a href="index.html">← Shop</a></header><main class="checkout"><h1>Checkout</h1><form id="form"><input id="name" required placeholder="Full name"><input id="phone" required placeholder="Phone number"><textarea id="address" required placeholder="Full delivery address"></textarea><input id="city" required placeholder="City"><input id="pin" required placeholder="PIN code"><button class="primary" type="submit">Pay Securely</button></form><p id="msg"></p></main>
+<script src="config.js"></script><script>
+const client=window.supabase.createClient(APP_CONFIG.SUPABASE_URL,APP_CONFIG.SUPABASE_PUBLISHABLE_KEY);
+const cart=JSON.parse(localStorage.getItem("checkout_cart")||"[]");
+document.getElementById("form").onsubmit=async e=>{e.preventDefault();const {data:{session}}=await client.auth.getSession();if(!session)return alert("Please sign in first.");
+const items=cart.map(x=>({product_id:x.id,name:x.name,qty:x.qty,price:x.price}));
+const payload={items,shipping:{name:name.value,phone:phone.value,address:address.value,city:city.value,pin:pin.value}};
+const {data,error}=await client.functions.invoke("create-razorpay-order",{body:payload});
+if(error||!data){msg.textContent=error?.message||"Could not create payment.";return}
+const r=new Razorpay({key:data.key,amount:data.amount,currency:"INR",name:"RealmTheResin",description:"Handmade resin art",order_id:data.order_id,prefill:{name:payload.shipping.name,contact:payload.shipping.phone}});
+r.on("payment.failed",x=>msg.textContent="Payment failed. Please try again.");
+r.on("payment.success",async x=>{
+ const v=await client.functions.invoke("verify-razorpay-payment",{body:{razorpay_order_id:x.razorpay_order_id,razorpay_payment_id:x.razorpay_payment_id,razorpay_signature:x.razorpay_signature}});
+ if(v.error){msg.textContent="Payment completed but verification failed. Contact support.";return}
+ localStorage.removeItem("checkout_cart");location.href="orders.html";
+});
+r.open();
+};
+</script></body></html>

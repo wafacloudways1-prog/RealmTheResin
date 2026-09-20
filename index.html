@@ -1,0 +1,15 @@
+<!doctype html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RealmTheResin | Handmade Resin Art</title><link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head><body>
+<header><div class="logo">✦ RealmTheResin</div><nav>
+<a href="#shop">Shop</a><a href="#about">About</a><a href="orders.html">My Orders</a>
+<button id="loginBtn" onclick="login()">Sign in with Google</button><button onclick="openCart()">🛒 <span id="cartCount">0</span></button></nav></header>
+<section class="hero"><div><small>HANDCRAFTED WITH LOVE</small><h1>Beautiful things<br>made with <b>resin.</b></h1>
+<p>Handmade alphabet resin art and décor made specially for you.</p><a class="primary" href="#shop">Shop Collection ✨</a></div></section>
+<section id="shop" class="shop"><small>OUR COLLECTION</small><h2>A–Z Resin Art</h2><p>Choose your favourite letter.</p><div id="products" class="grid"></div></section>
+<section id="about" class="about"><small>ABOUT US</small><h2>Small Business. Big Dreams. 💗</h2><p>Handcrafted resin pieces with a soft, feminine and modern aesthetic.</p></section>
+<footer>© 2026 RealmTheResin</footer>
+<div id="modal" class="modal"><div class="cart"><button class="close" onclick="closeCart()">×</button><h2>Your Cart</h2><div id="cartItems"></div><h3>Total: ₹<span id="total">0</span></h3><button class="primary full" onclick="checkout()">Checkout</button></div></div>
+<script src="config.js"></script><script src="app.js"></script></body></html>
