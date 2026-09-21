@@ -1,15 +1,89 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>RealmTheResin | Handmade Resin Art</title><link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head><body>
-<header><div class="logo">✦ RealmTheResin</div><nav>
-<a href="#shop">Shop</a><a href="#about">About</a><a href="orders.html">My Orders</a>
-<button id="loginBtn" onclick="login()">Sign in with Google</button><button onclick="openCart()">🛒 <span id="cartCount">0</span></button></nav></header>
-<section class="hero"><div><small>HANDCRAFTED WITH LOVE</small><h1>Beautiful things<br>made with <b>resin.</b></h1>
-<p>Handmade alphabet resin art and décor made specially for you.</p><a class="primary" href="#shop">Shop Collection ✨</a></div></section>
-<section id="shop" class="shop"><small>OUR COLLECTION</small><h2>A–Z Resin Art</h2><p>Choose your favourite letter.</p><div id="products" class="grid"></div></section>
-<section id="about" class="about"><small>ABOUT US</small><h2>Small Business. Big Dreams. 💗</h2><p>Handcrafted resin pieces with a soft, feminine and modern aesthetic.</p></section>
-<footer>© 2026 RealmTheResin</footer>
-<div id="modal" class="modal"><div class="cart"><button class="close" onclick="closeCart()">×</button><h2>Your Cart</h2><div id="cartItems"></div><h3>Total: ₹<span id="total">0</span></h3><button class="primary full" onclick="checkout()">Checkout</button></div></div>
-<script src="config.js"></script><script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RealmTheResin | Handmade Resin Art</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div id="authGate" class="auth-gate">
+    <div class="auth-card">
+      <div class="auth-logo">✦ RealmTheResin</div>
+      <span class="pill">HANDMADE RESIN ART</span>
+      <h1>Sign in to start shopping</h1>
+      <p>Your cart, delivery details and orders stay linked to your account.</p>
+      <button id="googleLoginBtn" class="google-btn" onclick="login()">Continue with Google</button>
+      <p id="authMessage" class="muted small"></p>
+    </div>
+  </div>
+
+  <div id="storeApp" class="hidden">
+    <header>
+      <div class="logo">✦ RealmTheResin</div>
+      <div class="header-actions">
+        <button class="nav-cart" onclick="openCart()">🛒 <span id="cartCount">0</span></button>
+        <button id="accountBtn" class="account-btn" onclick="openProfile()">Account</button>
+        <button class="menu-btn" onclick="toggleMenu()" aria-label="Open menu">☰</button>
+      </div>
+      <nav id="mobileMenu" class="mobile-menu">
+        <a href="index.html">Home</a>
+        <a href="#shop" onclick="closeMenu()">Products</a>
+        <a href="orders.html">Orders</a>
+        <button onclick="openCart();closeMenu()">Cart</button>
+        <button onclick="openProfile();closeMenu()">My details</button>
+        <a class="admin-menu" href="admin.html">Admin</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div>
+        <small>HANDCRAFTED WITH LOVE</small>
+        <h1>Beautiful things<br>made with <b>resin.</b></h1>
+        <p>Handmade alphabet resin art and décor made specially for you.</p>
+        <a class="primary" href="#shop">Shop Collection ✨</a>
+      </div>
+    </section>
+
+    <section id="shop" class="shop">
+      <small>OUR COLLECTION</small>
+      <h2>A–Z Resin Art</h2>
+      <p>Choose your favourite letter.</p>
+      <div id="products" class="grid"></div>
+    </section>
+
+    <section class="about">
+      <small>ABOUT US</small>
+      <h2>Small Business. Big Dreams. 💗</h2>
+      <p>Handcrafted resin pieces with a soft, feminine and modern aesthetic.</p>
+    </section>
+
+    <footer>© 2026 RealmTheResin · <a class="admin-mini" href="admin.html">Admin</a></footer>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="cart">
+      <button class="close" onclick="closeCart()">×</button>
+      <h2>Your Cart</h2>
+      <div id="cartItems"></div>
+      <h3>Total: ₹<span id="total">0</span></h3>
+      <button class="primary full" onclick="checkout()">Checkout</button>
+    </div>
+  </div>
+
+  <div id="profileModal" class="modal">
+    <div class="cart profile-card">
+      <button id="profileClose" class="close" onclick="closeProfile()">×</button>
+      <h2 id="profileTitle">Delivery details</h2>
+      <p class="muted">We save these details so checkout is faster next time.</p>
+      <form id="profileForm" class="form-grid" onsubmit="saveProfile(event)"></form>
+      <button class="primary full" form="profileForm" type="submit">Save details</button>
+      <button class="ghost full" onclick="logout()">Sign out</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

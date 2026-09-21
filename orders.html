@@ -1,21 +1,10 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>My Orders</title><link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head><body>
-<header><div class="logo">RealmTheResin</div><a href="index.html">Shop</a></header>
-<main class="shop"><h1>My Orders</h1><div id="orders"></div></main>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Orders | RealmTheResin</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<body><header><div class="logo">✦ RealmTheResin</div><div class="header-actions"><a class="text-link" href="index.html">Home</a><button onclick="logout()">Sign out</button></div></header>
+<main class="shop"><h1>My Orders</h1><p class="muted">Payment and delivery updates appear here.</p><div id="orders" class="orders-list"></div></main>
 <script src="config.js"></script><script>
-const ordersEl = document.getElementById("orders");
-if (!window.supabaseClient) {
-  ordersEl.innerHTML = "<p>Orders will appear here after Supabase is connected.</p>";
-} else {
-  (async()=>{
-    const {data:{session}}=await window.supabaseClient.auth.getSession();
-    if(!session){ordersEl.innerHTML="<p>Please sign in with Google first.</p>";return}
-    const {data,error}=await window.supabaseClient.from("orders").select("*").order("created_at",{ascending:false});
-    if(error){ordersEl.textContent=error.message;return}
-    ordersEl.innerHTML=data.map(o=>`<div class="product" style="max-width:700px;margin:15px auto;text-align:left"><h3>Order ${o.id.slice(0,8)}</h3><p>Status: <b>${o.status}</b></p><p>Payment: ${o.payment_status}</p><p>Total: ₹${o.total}</p><p>Expected delivery: ${o.delivery_date||"Not set yet"}</p></div>`).join("")||"<p>No orders yet.</p>";
-  })();
-}
+const c=window.supabaseClient,e=document.getElementById('orders');function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function statusLabel(o){if(o.payment_status==='paid')return 'Payment verified';if(o.payment_status==='pending_verification')return 'Payment awaiting admin verification';if(o.payment_status==='pending_payment')return 'Waiting for payment';if(o.payment_status==='rejected')return 'Payment needs attention';return o.payment_status||'Pending';}
+async function load(){if(!c){e.textContent='Supabase is not configured.';return;}const {data:{session}}=await c.auth.getSession();if(!session){location.href='index.html';return;}const {data,error}=await c.from('orders').select('*').order('created_at',{ascending:false});if(error){e.textContent=error.message;return;}e.innerHTML=(data||[]).map(o=>`<article class="product order-card"><div class="order-head"><h3>Order #${o.id.slice(0,8).toUpperCase()}</h3><span class="status-badge">${esc(statusLabel(o))}</span></div><p><b>Total:</b> ₹${o.total}</p><p><b>Items:</b> ${(o.items||[]).map(i=>`${esc(i.name)} × ${i.qty}`).join(', ')}</p><p><b>Order status:</b> ${esc(o.status)}</p><p><b>Delivery date:</b> ${esc(o.delivery_date||'Not set yet')}</p>${o.utr?`<p><b>UTR:</b> ${esc(o.utr)}</p>`:''}</article>`).join('')||'<p>No orders yet. <a href="index.html#shop">Start shopping</a>.</p>';}
+async function logout(){await c.auth.signOut();location.href='index.html';}window.logout=logout;load();if(c)c.auth.onAuthStateChange(()=>setTimeout(load,0));
 </script></body></html>

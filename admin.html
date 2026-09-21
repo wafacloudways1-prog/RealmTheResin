@@ -1,31 +1,34 @@
-<!doctype html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin | RealmTheResin</title><link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head><body>
-<header><div class="logo">RealmTheResin Admin</div><a href="index.html">Store</a></header>
-<main class="shop"><h1>Orders</h1><div id="admin"></div></main>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin | RealmTheResin</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<body>
+<header><div class="logo">RealmTheResin Admin</div><div class="header-actions"><a class="text-link" href="index.html">Store</a><button id="adminLogout" class="hidden" onclick="adminLogout()">Sign out</button></div></header>
+<main class="admin-wrap">
+  <section id="adminLoginBox" class="admin-login-card"><h1>Owner Admin</h1><p>Admin access uses GitHub login plus a server-side admin role.</p><button class="primary full" onclick="adminLogin()">Continue with GitHub</button><p id="adminMsg" class="muted small"></p></section>
+  <section id="adminPanel" class="hidden"><div class="admin-title"><div><h1>Admin Panel</h1><p class="muted">Verify payments, update orders and manage products.</p></div></div>
+    <div class="admin-tabs"><button onclick="showTab('ordersTab')">Orders</button><button onclick="showTab('productsTab')">Products</button></div>
+    <div id="ordersTab"><div id="adminOrders"></div></div>
+    <div id="productsTab" class="hidden"><div id="adminProducts" class="grid"></div></div>
+  </section>
+</main>
 <script src="config.js"></script><script>
-const adminEl=document.getElementById("admin");
-if(!window.supabaseClient){
-  adminEl.innerHTML="<p>Admin tools will be available after Supabase is connected.</p>";
-}else{
-  const c=window.supabaseClient;
-  async function load(){
-    const {data:{session}}=await c.auth.getSession();
-    if(!session){adminEl.innerHTML="<p>Sign in first.</p>";return}
-    const {data:profile}=await c.from("profiles").select("role").eq("id",session.user.id).single();
-    if(profile?.role!=="admin"){adminEl.innerHTML="<p>Admin access required.</p>";return}
-    const {data,error}=await c.from("orders").select("*").order("created_at",{ascending:false});
-    if(error){adminEl.textContent=error.message;return}
-    adminEl.innerHTML=data.map(o=>`<div class="product" style="max-width:850px;margin:15px auto;text-align:left"><h3>${o.id}</h3><p>${o.customer_name} • ${o.phone}</p><p>${o.address}, ${o.city} - ${o.pin}</p><p>Total ₹${o.total} • Payment ${o.payment_status}</p><p>Status: ${o.status} • Delivery: ${o.delivery_date||"not set"}</p><button onclick="updateStatus('${o.id}')">Update</button></div>`).join("")}
-  async function updateStatus(id){
-    let s=prompt("New status: processing / shipped / delivered / cancelled"); if(!s)return;
-    let d=prompt("Delivery date YYYY-MM-DD (optional)");
-    const {error}=await c.functions.invoke("update-order-status",{body:{order_id:id,status:s,delivery_date:d||null}});
-    if(error)alert(error.message); else load();
-  }
-  window.updateStatus=updateStatus;
-  load();
+const c=window.supabaseClient,$=id=>document.getElementById(id);function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function adminLogin(){if(!c)return $('adminMsg').textContent='Supabase is not configured.';await c.auth.signOut();const {error}=await c.auth.signInWithOAuth({provider:'github',options:{redirectTo:location.origin+'/admin.html'}});if(error)$('adminMsg').textContent=error.message;}
+async function adminLogout(){await c.auth.signOut();location.reload();}
+function showTab(id){$('ordersTab').classList.toggle('hidden',id!=='ordersTab');$('productsTab').classList.toggle('hidden',id!=='productsTab');}
+async function loadAdmin(){
+  if(!c)return $('adminMsg').textContent='Supabase is not configured.';
+  const {data:{session}}=await c.auth.getSession();if(!session)return;
+  const providers=session.user.app_metadata?.providers||[session.user.app_metadata?.provider].filter(Boolean);
+  if(!providers.includes('github')){$('adminMsg').textContent='Admin must be signed in with the authorized GitHub account.';return;}
+  const {data:p,error}=await c.from('profiles').select('role,full_name,email').eq('id',session.user.id).single();
+  if(error||p?.role!=='admin'){$('adminMsg').innerHTML='This GitHub account is not authorized yet. In Supabase → Authentication → Users, copy this GitHub user UUID and set that profile role to admin in SQL Editor.<br><code>'+esc(session.user.id)+'</code>';return;}
+  $('adminLoginBox').classList.add('hidden');$('adminPanel').classList.remove('hidden');$('adminLogout').classList.remove('hidden');await Promise.all([loadOrders(),loadProducts()]);
 }
+async function loadOrders(){const {data,error}=await c.from('orders').select('*').order('created_at',{ascending:false});if(error)return $('adminOrders').textContent=error.message;$('adminOrders').innerHTML=(data||[]).map(o=>`<article class="product order-card"><div class="order-head"><h3>#${o.id.slice(0,8).toUpperCase()}</h3><span class="status-badge">${esc(o.payment_status)}</span></div><p><b>${esc(o.customer_name)}</b> · ${esc(o.phone)}</p><p>${esc(o.address)}, ${esc(o.city)}, ${esc(o.state)} - ${esc(o.pin)}</p><p><b>Items:</b> ${(o.items||[]).map(i=>`${esc(i.name)} × ${i.qty}`).join(', ')}</p><p><b>Total:</b> ₹${o.total}</p><p><b>UPI:</b> ${esc(o.upi_id||'—')} · <b>UTR:</b> ${esc(o.utr||'—')}</p><div class="admin-actions"><button onclick="approve('${o.id}')">Approve payment</button><button class="ghost" onclick="rejectPayment('${o.id}')">Reject payment</button><button class="ghost" onclick="updateOrder('${o.id}','${esc(o.status)}','${esc(o.delivery_date||'')}')">Status / delivery</button></div></article>`).join('')||'<p>No orders yet.</p>';}
+async function approve(id){if(!confirm('Only approve after you have checked the money arrived in your UPI account. Continue?'))return;const {error}=await c.from('orders').update({payment_status:'paid',status:'confirmed'}).eq('id',id);if(error)alert(error.message);else loadOrders();}
+async function rejectPayment(id){const note=prompt('Optional reason for rejection:')||'';const {error}=await c.from('orders').update({payment_status:'rejected',status:note?`payment_issue: ${note}`:'payment_issue'}).eq('id',id);if(error)alert(error.message);else loadOrders();}
+async function updateOrder(id,current,date){const status=prompt('Status: confirmed / preparing / shipped / out_for_delivery / delivered / cancelled',current||'confirmed');if(!status)return;const delivery=prompt('Delivery date YYYY-MM-DD (leave blank if unknown)',date||'')||null;const {error}=await c.from('orders').update({status,delivery_date:delivery}).eq('id',id);if(error)alert(error.message);else loadOrders();}
+async function loadProducts(){const {data,error}=await c.from('products').select('*').order('id');if(error)return $('adminProducts').textContent=error.message;$('adminProducts').innerHTML=(data||[]).map(p=>`<article class="product"><img src="${esc(p.image_url||`images/${p.id}.jpg`)}"><h3>${esc(p.name)}</h3><label>Price<input id="price_${esc(p.id)}" type="number" min="0" value="${p.price}"></label><label>Discount<input id="discount_${esc(p.id)}" type="number" min="0" value="${p.discount||0}"></label><label class="toggle-line"><input id="active_${esc(p.id)}" type="checkbox" ${p.active?'checked':''}> Active</label><button onclick="saveProduct('${esc(p.id)}')">Save product</button></article>`).join('');}
+async function saveProduct(id){const price=Number($('price_'+id).value),discount=Number($('discount_'+id).value),active=$('active_'+id).checked;const {error}=await c.from('products').update({price,discount,active}).eq('id',id);if(error)alert(error.message);else alert('Product updated.');}
+window.adminLogin=adminLogin;window.adminLogout=adminLogout;window.showTab=showTab;window.approve=approve;window.rejectPayment=rejectPayment;window.updateOrder=updateOrder;window.saveProduct=saveProduct;loadAdmin();
 </script></body></html>

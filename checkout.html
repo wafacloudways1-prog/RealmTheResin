@@ -1,93 +1,77 @@
 <!doctype html>
-<html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Checkout | RealmTheResin</title>
-<link rel="stylesheet" href="style.css">
-<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head><body>
-<header><div class="logo">RealmTheResin</div><a href="index.html">← Shop</a></header>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Checkout | RealmTheResin</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="logo">✦ RealmTheResin</div>
+  <div class="header-actions"><a class="text-link" href="index.html">Home</a><a class="text-link" href="orders.html">Orders</a></div>
+</header>
 <main class="checkout">
-<h1>Checkout</h1>
-<div id="setupNotice" class="product" style="max-width:700px;margin:20px auto;text-align:left"></div>
-<form id="form">
-<input id="name" required placeholder="Full name">
-<input id="phone" required placeholder="Phone number">
-<textarea id="address" required placeholder="Full delivery address"></textarea>
-<input id="city" required placeholder="City">
-<input id="pin" required placeholder="PIN code">
-<button class="primary" type="submit">Pay Securely</button>
-</form>
-<p id="msg"></p>
+  <h1>Checkout</h1>
+  <div class="checkout-card">
+    <div id="summary"></div>
+    <div id="profile"></div>
+    <button id="payBtn" class="primary full">Generate ₹<span id="payAmount">0</span> UPI QR</button>
+    <div id="qrWrap" class="qr-wrap hidden">
+      <h2>Pay exactly <span id="amount"></span></h2>
+      <p class="muted">Order reference: <b id="orderRef"></b></p>
+      <div id="qrcode"></div>
+      <a id="upiOpen" class="primary full block" href="#">Open UPI app</a>
+      <p class="upi" id="upi"></p>
+      <p class="muted">After payment, copy the UTR / transaction reference from your UPI app and submit it below. Your order will stay pending until the admin checks the payment.</p>
+      <input id="utr" placeholder="UTR / transaction reference" autocomplete="off">
+      <button id="submitPay" class="primary full">I paid — submit for verification</button>
+    </div>
+    <p id="msg"></p>
+  </div>
 </main>
 <script src="config.js"></script>
 <script>
-const notice = document.getElementById("setupNotice");
-const form = document.getElementById("form");
+const c=window.supabaseClient, cart=JSON.parse(localStorage.getItem('checkout_cart')||'[]'), $=id=>document.getElementById(id);
+const total=cart.reduce((s,x)=>s+Number(x.price)*Number(x.qty),0);
+let currentOrder=null;
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+(async()=>{
+  if(!c){$('msg').textContent='Supabase is not configured.';return;}
+  const {data:{session}}=await c.auth.getSession();
+  if(!session){location.href='index.html';return;}
+  if(!cart.length){$('msg').innerHTML='Your checkout cart is empty. <a href="index.html">Go back to the shop</a>.';$('payBtn').classList.add('hidden');return;}
+  const {data:p}=await c.from('profiles').select('*').eq('id',session.user.id).single();
+  if(!p||!p.full_name||!p.phone||!p.address||!p.city||!p.state||!p.pin){location.href='index.html';return;}
+  $('summary').innerHTML=`<h2>Order summary</h2>${cart.map(x=>`<div class="checkout-line"><span>${esc(x.name)} × ${x.qty}</span><b>₹${Number(x.price)*Number(x.qty)}</b></div>`).join('')}<div class="checkout-total"><span>Total</span><b>₹${total}</b></div>`;
+  $('profile').innerHTML=`<div class="address-box"><b>Deliver to</b><br>${esc(p.full_name)}<br>${esc(p.address)}, ${esc(p.city)}, ${esc(p.state)} ${esc(p.pin)}<br>${esc(p.phone)}</div>`;
+  $('payAmount').textContent=total.toFixed(2);
 
-if (!window.supabaseClient) {
-  notice.innerHTML = "<h3>Preview mode</h3><p>Products and cart are ready. Supabase login and Razorpay payment will be connected after the preview is approved.</p>";
-  form.addEventListener("submit", e => {
-    e.preventDefault();
-    document.getElementById("msg").textContent = "Payment is not configured yet.";
-  });
-} else {
-  const client = window.supabaseClient;
-  const cart = JSON.parse(localStorage.getItem("checkout_cart") || "[]");
-
-  form.onsubmit = async e => {
-    e.preventDefault();
-    const { data: { session } } = await client.auth.getSession();
-    if (!session) return alert("Please sign in first.");
-
-    const items = cart.map(x => ({product_id:x.id,name:x.name,qty:x.qty,price:x.price}));
-    const payload = {
-      items,
-      shipping: {
-        name: document.getElementById("name").value,
-        phone: document.getElementById("phone").value,
-        address: document.getElementById("address").value,
-        city: document.getElementById("city").value,
-        pin: document.getElementById("pin").value
-      }
-    };
-
-    const {data,error} = await client.functions.invoke("create-razorpay-order",{body:payload});
-    if (error || !data) {
-      document.getElementById("msg").textContent = error?.message || "Could not create payment.";
-      return;
-    }
-
-    const r = new Razorpay({
-      key:data.key,
-      amount:data.amount,
-      currency:"INR",
-      name:"RealmTheResin",
-      description:"Handmade resin art",
-      order_id:data.order_id,
-      prefill:{name:payload.shipping.name,contact:payload.shipping.phone},
-      handler: async function (response) {
-        const v = await client.functions.invoke("verify-razorpay-payment", {
-          body:{
-            razorpay_order_id:response.razorpay_order_id,
-            razorpay_payment_id:response.razorpay_payment_id,
-            razorpay_signature:response.razorpay_signature
-          }
-        });
-        if (v.error) {
-          document.getElementById("msg").textContent = "Payment completed but verification failed.";
-          return;
-        }
-        localStorage.removeItem("checkout_cart");
-        location.href="orders.html";
-      }
-    });
-
-    r.on("payment.failed", () => {
-      document.getElementById("msg").textContent="Payment failed. Please try again.";
-    });
-    r.open();
+  $('payBtn').onclick=async()=>{
+    const upiId=window.APP_CONFIG.UPI_ID;
+    if(!upiId||upiId.includes('YOUR_'))return alert('Store UPI ID is not configured.');
+    $('payBtn').disabled=true;$('payBtn').textContent='Creating order…';
+    const requestedItems=cart.map(x=>({product_id:x.id,qty:Number(x.qty)}));
+    const {data:order,error}=await c.rpc('create_upi_order',{p_items:requestedItems});
+    if(error){$('payBtn').disabled=false;$('payBtn').innerHTML='Generate ₹<span id="payAmount">'+total.toFixed(2)+'</span> UPI QR';return $('msg').textContent=error.message;}
+    currentOrder=order;
+    const ref='RTR-'+order.id.slice(0,8).toUpperCase();
+    const upi=`upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(window.APP_CONFIG.STORE_NAME)}&am=${total.toFixed(2)}&cu=INR&tn=${encodeURIComponent(ref)}`;
+    $('qrcode').innerHTML='';new QRCode($('qrcode'),{text:upi,width:240,height:240});
+    $('amount').textContent='₹'+total.toFixed(2);$('orderRef').textContent=ref;$('upi').textContent=upiId;$('upiOpen').href=upi;
+    $('qrWrap').classList.remove('hidden');$('payBtn').classList.add('hidden');
   };
-}
+
+  $('submitPay').onclick=async()=>{
+    if(!currentOrder)return alert('Generate the payment QR first.');
+    const utr=$('utr').value.trim();
+    if(!/^[A-Za-z0-9-]{6,40}$/.test(utr))return alert('Enter the transaction reference shown in your UPI app.');
+    $('submitPay').disabled=true;$('submitPay').textContent='Submitting…';
+    const {error}=await c.rpc('submit_payment_reference',{p_order_id:currentOrder.id,p_utr:utr});
+    if(error){$('submitPay').disabled=false;$('submitPay').textContent='I paid — submit for verification';return $('msg').textContent=error.message;}
+    localStorage.removeItem('checkout_cart');localStorage.removeItem('realm_cart');location.href='orders.html';
+  };
+})();
 </script>
 </body></html>
