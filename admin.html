@@ -1,34 +1,339 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin | RealmTheResin</title><link rel="stylesheet" href="style.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin | RealmTheResin</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+.pm-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+.pm-form{display:grid;gap:12px;margin-bottom:18px}
+.pm-form label{display:grid;gap:6px;font-weight:600}
+.pm-form textarea{min-height:110px;resize:vertical}
+.pm-form input,.pm-form textarea,.pm-form select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:10px}
+.pm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.pm-card{background:#fff;border:1px solid #eadde5;border-radius:16px;padding:14px;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+.pm-card h3{margin:8px 0}
+.pm-cover{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;background:#f8f8f8}
+.pm-thumbs{display:flex;gap:6px;overflow:auto;margin:8px 0}
+.pm-thumb{width:54px;height:54px;object-fit:cover;border-radius:8px;flex:0 0 auto}
+.pm-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.pm-actions button{flex:1}
+.pm-muted{font-size:.85rem;color:#777}
+.pm-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:1000}
+.pm-modal-card{background:#fff;border-radius:18px;max-width:700px;width:100%;max-height:92vh;overflow:auto;padding:20px}
+.pm-modal-head{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.pm-photo-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px}
+.pm-photo{position:relative;border:1px solid #eee;border-radius:10px;padding:6px}
+.pm-photo img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:7px}
+.pm-photo button{width:100%;margin-top:5px}
+.pm-drop{border:2px dashed #e4b6cc;border-radius:14px;padding:18px;text-align:center;background:#fff8fc}
+.pm-status{font-size:.9rem;margin-top:8px}
+</style>
+</head>
 <body>
-<header><div class="logo">RealmTheResin Admin</div><div class="header-actions"><a class="text-link" href="index.html">Store</a><button id="adminLogout" class="hidden" onclick="adminLogout()">Sign out</button></div></header>
+<header>
+  <div class="logo">RealmTheResin Admin</div>
+  <div class="header-actions">
+    <a class="text-link" href="index.html">Store</a>
+    <button id="adminLogout" class="hidden" onclick="adminLogout()">Sign out</button>
+  </div>
+</header>
+
 <main class="admin-wrap">
-  <section id="adminLoginBox" class="admin-login-card"><h1>Owner Admin</h1><p>Admin access uses GitHub login plus a server-side admin role.</p><button class="primary full" onclick="adminLogin()">Continue with GitHub</button><p id="adminMsg" class="muted small"></p></section>
-  <section id="adminPanel" class="hidden"><div class="admin-title"><div><h1>Admin Panel</h1><p class="muted">Verify payments, update orders and manage products.</p></div></div>
-    <div class="admin-tabs"><button onclick="showTab('ordersTab')">Orders</button><button onclick="showTab('productsTab')">Products</button></div>
-    <div id="ordersTab"><div id="adminOrders"></div></div>
-    <div id="productsTab" class="hidden"><div id="adminProducts" class="grid"></div></div>
-  </section>
+<section id="adminLoginBox" class="admin-login-card">
+  <h1>Owner Admin</h1>
+  <p>Admin access uses GitHub login plus a server-side admin role.</p>
+  <button class="primary full" onclick="adminLogin()">Continue with GitHub</button>
+  <p id="adminMsg" class="muted small"></p>
+</section>
+
+<section id="adminPanel" class="hidden">
+  <div class="admin-title">
+    <div><h1>Admin Panel</h1><p class="muted">Manage orders, payments and every product.</p></div>
+  </div>
+  <div class="admin-tabs">
+    <button onclick="showTab('ordersTab')">Orders</button>
+    <button onclick="showTab('paymentsTab')">Payment Verification <span id="pendingCount"></span></button>
+    <button onclick="showTab('productsTab')">Products</button>
+  </div>
+
+  <div id="ordersTab">
+    <div class="pm-toolbar"><button class="ghost" onclick="loadOrders()">Refresh orders</button></div>
+    <div id="adminOrders"></div>
+  </div>
+
+  <div id="paymentsTab" class="hidden">
+    <div class="pm-card"><b>Manual UTR verification</b><p class="muted small">Check your own UPI/FamPay transaction history and match the exact amount and UTR before approving. The website does not independently verify the payment.</p></div>
+    <div id="paymentSummary" class="verify-summary"></div>
+    <div class="pm-toolbar"><button class="ghost" onclick="loadPendingPayments()">Refresh payments</button></div>
+    <div id="pendingPayments"></div>
+  </div>
+
+  <div id="productsTab" class="hidden">
+    <div class="pm-toolbar">
+      <button class="primary" onclick="openProductEditor()">＋ Add New Product</button>
+      <button class="ghost" onclick="loadProductsAdmin()">Refresh products</button>
+      <span id="productMsg" class="pm-status"></span>
+    </div>
+    <div class="pm-card pm-form">
+      <b>All products are editable</b>
+      <span class="pm-muted">A–Z products and new products use the same editor. Each product can have 1 photo or multiple photos.</span>
+    </div>
+    <div id="adminProducts" class="pm-grid"></div>
+  </div>
+</section>
 </main>
-<script src="config.js"></script><script>
-const c=window.supabaseClient,$=id=>document.getElementById(id);function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-async function adminLogin(){if(!c)return $('adminMsg').textContent='Supabase is not configured.';await c.auth.signOut();const {error}=await c.auth.signInWithOAuth({provider:'github',options:{redirectTo:location.origin+'/admin.html'}});if(error)$('adminMsg').textContent=error.message;}
+
+<div id="productModal" class="pm-modal">
+  <div class="pm-modal-card">
+    <div class="pm-modal-head">
+      <h2 id="pmTitle">Add Product</h2>
+      <button class="close" onclick="closeProductEditor()">×</button>
+    </div>
+    <form id="productForm" class="pm-form" onsubmit="saveProduct(event)">
+      <input type="hidden" id="pmId">
+      <label>Product name
+        <input id="pmName" required maxlength="160" placeholder="e.g. Resin Letter A">
+      </label>
+      <label>Description
+        <textarea id="pmDescription" maxlength="2000" placeholder="Tell customers about this product..."></textarea>
+      </label>
+      <label>Price (₹)
+        <input id="pmPrice" type="number" min="0" step="0.01" required>
+      </label>
+      <label>Discount (₹)
+        <input id="pmDiscount" type="number" min="0" step="0.01" value="0">
+      </label>
+      <label class="toggle-line">
+        <input id="pmActive" type="checkbox" checked> Active / visible in store
+      </label>
+
+      <div class="pm-drop">
+        <b>Product photos</b>
+        <p class="pm-muted">Choose one photo or multiple photos. You can add more later.</p>
+        <input id="pmFiles" type="file" accept="image/*" multiple>
+      </div>
+
+      <div>
+        <b>Current photos</b>
+        <div id="pmPhotos" class="pm-photo-row"></div>
+      </div>
+
+      <div class="pm-actions">
+        <button type="submit" class="primary" id="pmSaveBtn">Save Product</button>
+        <button type="button" class="ghost" onclick="closeProductEditor()">Cancel</button>
+      </div>
+      <p id="pmFormMsg" class="pm-status"></p>
+    </form>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const c=window.supabaseClient;
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const money=v=>'₹'+Number(v||0).toFixed(2);
+
+let adminProductsData=[];
+let editorPhotos=[]; // [{url,path}]
+let pendingFiles=[];
+
+function adminLogin(){
+  if(!c)return $('adminMsg').textContent='Supabase is not configured.';
+  c.auth.signOut().then(()=>c.auth.signInWithOAuth({provider:'github',options:{redirectTo:location.origin+'/admin.html'}}))
+    .then(({error})=>{if(error)$('adminMsg').textContent=error.message;});
+}
 async function adminLogout(){await c.auth.signOut();location.reload();}
-function showTab(id){$('ordersTab').classList.toggle('hidden',id!=='ordersTab');$('productsTab').classList.toggle('hidden',id!=='productsTab');}
+
+function showTab(id){
+  ['ordersTab','paymentsTab','productsTab'].forEach(x=>$(x).classList.toggle('hidden',x!==id));
+  if(id==='paymentsTab')loadPendingPayments();
+  if(id==='productsTab')loadProductsAdmin();
+}
+
 async function loadAdmin(){
   if(!c)return $('adminMsg').textContent='Supabase is not configured.';
-  const {data:{session}}=await c.auth.getSession();if(!session)return;
+  const {data:{session}}=await c.auth.getSession();
+  if(!session)return;
   const providers=session.user.app_metadata?.providers||[session.user.app_metadata?.provider].filter(Boolean);
-  if(!providers.includes('github')){$('adminMsg').textContent='Admin must be signed in with the authorized GitHub account.';return;}
-  const {data:p,error}=await c.from('profiles').select('role,full_name,email').eq('id',session.user.id).single();
-  if(error||p?.role!=='admin'){$('adminMsg').innerHTML='This GitHub account is not authorized yet. In Supabase → Authentication → Users, copy this GitHub user UUID and set that profile role to admin in SQL Editor.<br><code>'+esc(session.user.id)+'</code>';return;}
-  $('adminLoginBox').classList.add('hidden');$('adminPanel').classList.remove('hidden');$('adminLogout').classList.remove('hidden');await Promise.all([loadOrders(),loadProducts()]);
+  if(!providers.includes('github'))return $('adminMsg').textContent='Admin must be signed in with GitHub.';
+  const {data:p,error}=await c.from('profiles').select('role').eq('id',session.user.id).single();
+  if(error||p?.role!=='admin'){
+    $('adminMsg').innerHTML='This GitHub account is not authorized.<br><code>'+esc(session.user.id)+'</code>';
+    return;
+  }
+  $('adminLoginBox').classList.add('hidden');
+  $('adminPanel').classList.remove('hidden');
+  $('adminLogout').classList.remove('hidden');
+  await Promise.all([loadOrders(),loadPendingPayments(),loadProductsAdmin()]);
 }
-async function loadOrders(){const {data,error}=await c.from('orders').select('*').order('created_at',{ascending:false});if(error)return $('adminOrders').textContent=error.message;$('adminOrders').innerHTML=(data||[]).map(o=>`<article class="product order-card"><div class="order-head"><h3>#${o.id.slice(0,8).toUpperCase()}</h3><span class="status-badge">${esc(o.payment_status)}</span></div><p><b>${esc(o.customer_name)}</b> · ${esc(o.phone)}</p><p>${esc(o.address)}, ${esc(o.city)}, ${esc(o.state)} - ${esc(o.pin)}</p><p><b>Items:</b> ${(o.items||[]).map(i=>`${esc(i.name)} × ${i.qty}`).join(', ')}</p><p><b>Total:</b> ₹${o.total}</p><p><b>UPI:</b> ${esc(o.upi_id||'—')} · <b>UTR:</b> ${esc(o.utr||'—')}</p><div class="admin-actions"><button onclick="approve('${o.id}')">Approve payment</button><button class="ghost" onclick="rejectPayment('${o.id}')">Reject payment</button><button class="ghost" onclick="updateOrder('${o.id}','${esc(o.status)}','${esc(o.delivery_date||'')}')">Status / delivery</button></div></article>`).join('')||'<p>No orders yet.</p>';}
-async function approve(id){if(!confirm('Only approve after you have checked the money arrived in your UPI account. Continue?'))return;const {error}=await c.from('orders').update({payment_status:'paid',status:'confirmed'}).eq('id',id);if(error)alert(error.message);else loadOrders();}
-async function rejectPayment(id){const note=prompt('Optional reason for rejection:')||'';const {error}=await c.from('orders').update({payment_status:'rejected',status:note?`payment_issue: ${note}`:'payment_issue'}).eq('id',id);if(error)alert(error.message);else loadOrders();}
-async function updateOrder(id,current,date){const status=prompt('Status: confirmed / preparing / shipped / out_for_delivery / delivered / cancelled',current||'confirmed');if(!status)return;const delivery=prompt('Delivery date YYYY-MM-DD (leave blank if unknown)',date||'')||null;const {error}=await c.from('orders').update({status,delivery_date:delivery}).eq('id',id);if(error)alert(error.message);else loadOrders();}
-async function loadProducts(){const {data,error}=await c.from('products').select('*').order('id');if(error)return $('adminProducts').textContent=error.message;$('adminProducts').innerHTML=(data||[]).map(p=>`<article class="product"><img src="${esc(p.image_url||`images/${p.id}.jpg`)}"><h3>${esc(p.name)}</h3><label>Price<input id="price_${esc(p.id)}" type="number" min="0" value="${p.price}"></label><label>Discount<input id="discount_${esc(p.id)}" type="number" min="0" value="${p.discount||0}"></label><label class="toggle-line"><input id="active_${esc(p.id)}" type="checkbox" ${p.active?'checked':''}> Active</label><button onclick="saveProduct('${esc(p.id)}')">Save product</button></article>`).join('');}
-async function saveProduct(id){const price=Number($('price_'+id).value),discount=Number($('discount_'+id).value),active=$('active_'+id).checked;const {error}=await c.from('products').update({price,discount,active}).eq('id',id);if(error)alert(error.message);else alert('Product updated.');}
-window.adminLogin=adminLogin;window.adminLogout=adminLogout;window.showTab=showTab;window.approve=approve;window.rejectPayment=rejectPayment;window.updateOrder=updateOrder;window.saveProduct=saveProduct;loadAdmin();
-</script></body></html>
+
+async function loadOrders(){
+  const {data,error}=await c.from('orders').select('*').order('created_at',{ascending:false});
+  if(error)return $('adminOrders').textContent=error.message;
+  $('adminOrders').innerHTML=(data||[]).map(o=>`
+    <article class="product order-card">
+      <div class="order-head"><h3>#${esc(o.id.slice(0,8).toUpperCase())}</h3><span class="status-badge">${esc(o.payment_status)}</span></div>
+      <p><b>${esc(o.customer_name)}</b> · ${esc(o.phone)}</p>
+      <p>${esc(o.address)}, ${esc(o.city)}, ${esc(o.state||'')} - ${esc(o.pin)}</p>
+      <p><b>Items:</b> ${(o.items||[]).map(i=>`${esc(i.name)} × ${esc(i.qty)}`).join(', ')}</p>
+      <p><b>Total:</b> ${money(o.total)}</p>
+      <p><b>UPI:</b> ${esc(o.upi_id||'—')} · <b>UTR:</b> ${esc(o.utr||'—')}</p>
+      <p><b>Status:</b> ${esc(o.status||'—')} · <b>Delivery:</b> ${esc(o.delivery_date||'Not set')}</p>
+      <div class="admin-actions">
+        ${o.payment_status==='pending_verification'?`<button onclick="verifyPayment('${o.id}')">Verify UTR & approve</button><button class="ghost" onclick="rejectPayment('${o.id}')">Reject payment</button>`:''}
+        <button class="ghost" onclick="updateOrder('${o.id}','${esc(o.status||'confirmed')}','${esc(o.delivery_date||'')}')">Status / delivery</button>
+      </div>
+    </article>`).join('')||'<p>No orders yet.</p>';
+}
+async function loadPendingPayments(){
+  const {data,error}=await c.from('orders').select('*').eq('payment_status','pending_verification').order('created_at',{ascending:true});
+  if(error)return $('pendingPayments').textContent=error.message;
+  const rows=data||[];
+  $('pendingCount').textContent=rows.length?`(${rows.length})`:'';
+  $('paymentSummary').innerHTML=`<div class="verify-stat"><b>${rows.length}</b><span>Pending verification</span></div><div class="verify-stat"><b>${money(rows.reduce((s,o)=>s+Number(o.total||0),0))}</b><span>Amount to check</span></div>`;
+  $('pendingPayments').innerHTML=rows.length?rows.map(o=>`
+    <article class="product order-card verify-card">
+      <h3>Payment #${esc(o.id.slice(0,8).toUpperCase())}</h3>
+      <p><b>Customer:</b> ${esc(o.customer_name)} · ${esc(o.phone)}</p>
+      <p><b>Amount:</b> ${money(o.total)} · <b>Payee:</b> ${esc(o.upi_id||'—')}</p>
+      <p><b>UTR / reference:</b></p><div class="utr-box">${esc(o.utr||'No UTR')}</div>
+      <div class="admin-actions"><button onclick="verifyPayment('${o.id}')">✓ Verify UTR & approve</button><button class="ghost" onclick="rejectPayment('${o.id}')">Reject</button></div>
+    </article>`).join(''):'<p>No payments waiting for verification.</p>';
+}
+async function verifyPayment(id){
+  const {data:o,error}=await c.from('orders').select('id,total,utr,payment_status').eq('id',id).single();
+  if(error)return alert(error.message);
+  if(o.payment_status!=='pending_verification'||!o.utr)return alert('Payment is not waiting for valid verification.');
+  if(!confirm(`Verify manually?\n\nAmount: ${money(o.total)}\nUTR: ${o.utr}\n\nConfirm it matches your transaction history.`))return;
+  const {error:e}=await c.from('orders').update({payment_status:'paid',status:'confirmed'}).eq('id',id).eq('payment_status','pending_verification');
+  if(e)alert(e.message);else await Promise.all([loadOrders(),loadPendingPayments()]);
+}
+async function rejectPayment(id){
+  const note=prompt('Optional reason:')||'';
+  const {error}=await c.from('orders').update({payment_status:'rejected',status:note?`payment_issue: ${note}`:'payment_issue'}).eq('id',id).eq('payment_status','pending_verification');
+  if(error)alert(error.message);else await Promise.all([loadOrders(),loadPendingPayments()]);
+}
+async function updateOrder(id,current,date){
+  const status=prompt('Status: confirmed / preparing / shipped / out_for_delivery / delivered / cancelled',current||'confirmed');
+  if(!status)return;
+  const delivery=prompt('Delivery date YYYY-MM-DD (blank if unknown)',date||'')||null;
+  const {error}=await c.from('orders').update({status,delivery_date:delivery}).eq('id',id);
+  if(error)alert(error.message);else loadOrders();
+}
+
+function productImages(p){
+  if(Array.isArray(p.image_urls)&&p.image_urls.length)return p.image_urls;
+  return p.image_url?[p.image_url]:[];
+}
+function renderEditorPhotos(){
+  $('pmPhotos').innerHTML=editorPhotos.length?editorPhotos.map((x,i)=>`
+    <div class="pm-photo">
+      <img src="${esc(x.url)}" alt="">
+      <button type="button" class="ghost" onclick="removeExistingPhoto(${i})">Remove</button>
+    </div>`).join(''):'<span class="pm-muted">No photos yet.</span>';
+}
+function removeExistingPhoto(i){editorPhotos.splice(i,1);renderEditorPhotos();}
+
+function openProductEditor(product=null){
+  $('productModal').style.display='flex';
+  $('pmTitle').textContent=product?'Edit Product':'Add New Product';
+  $('pmId').value=product?.id||'';
+  $('pmName').value=product?.name||'';
+  $('pmDescription').value=product?.description||'';
+  $('pmPrice').value=product?.price??149;
+  $('pmDiscount').value=product?.discount??0;
+  $('pmActive').checked=product?.active!==false;
+  $('pmFiles').value='';
+  $('pmFormMsg').textContent='';
+  editorPhotos=product?productImages(product).map(url=>({url,path:null})):[];
+  pendingFiles=[];
+  renderEditorPhotos();
+}
+function closeProductEditor(){$('productModal').style.display='none';}
+$('pmFiles').addEventListener('change',e=>{
+  pendingFiles=[...e.target.files];
+  $('pmFormMsg').textContent=pendingFiles.length?`${pendingFiles.length} new photo(s) selected.`:'';
+});
+
+async function uploadFiles(productId){
+  const uploaded=[];
+  for(const file of pendingFiles){
+    if(!file.type.startsWith('image/'))throw new Error('Only image files are allowed.');
+    if(file.size>8*1024*1024)throw new Error(`${file.name} is larger than 8 MB.`);
+    const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,'-');
+    const path=`${productId}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
+    const {error}=await c.storage.from('product-images').upload(path,file,{upsert:false,contentType:file.type});
+    if(error)throw error;
+    const {data}=c.storage.from('product-images').getPublicUrl(path);
+    uploaded.push({url:data.publicUrl,path});
+  }
+  return uploaded;
+}
+
+async function saveProduct(e){
+  e.preventDefault();
+  if(!c)return;
+  const id=$('pmId').value.trim()||`P-${crypto.randomUUID()}`;
+  const name=$('pmName').value.trim();
+  const description=$('pmDescription').value.trim();
+  const price=Number($('pmPrice').value);
+  const discount=Number($('pmDiscount').value||0);
+  const active=$('pmActive').checked;
+  if(!name)return alert('Enter a product name.');
+  if(!Number.isFinite(price)||price<0)return alert('Enter a valid price.');
+  if(!Number.isFinite(discount)||discount<0||discount>price)return alert('Discount must be between ₹0 and the price.');
+  $('pmSaveBtn').disabled=true;$('pmFormMsg').textContent='Saving…';
+  try{
+    const uploaded=await uploadFiles(id);
+    const allPhotos=[...editorPhotos.filter(x=>x.url),...uploaded];
+    const urls=allPhotos.map(x=>x.url);
+    const payload={id,name,description,price,discount,active,image_url:urls[0]||null,image_urls:urls};
+    const {error}=await c.from('products').upsert(payload,{onConflict:'id'});
+    if(error)throw error;
+    $('pmFormMsg').textContent='Saved successfully.';
+    await loadProductsAdmin();
+    setTimeout(closeProductEditor,350);
+  }catch(err){$('pmFormMsg').textContent=err.message||String(err);}
+  finally{$('pmSaveBtn').disabled=false;}
+}
+
+async function deleteProduct(id){
+  const p=adminProductsData.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm(`Delete "${p.name}"? This removes the product from the store.`))return;
+  const {error}=await c.from('products').delete().eq('id',id);
+  if(error)return alert(error.message);
+  await loadProductsAdmin();
+}
+
+async function loadProductsAdmin(){
+  const {data,error}=await c.from('products').select('*').order('created_at',{ascending:true}).order('id');
+  if(error)return $('adminProducts').textContent=error.message;
+  adminProductsData=data||[];
+  $('adminProducts').innerHTML=adminProductsData.map(p=>{
+    const imgs=productImages(p);
+    return `<article class="pm-card">
+      <img class="pm-cover" src="${esc(imgs[0]||`images/${esc(p.id)}.jpg`)}" alt="${esc(p.name)}">
+      <h3>${esc(p.name)}</h3>
+      <p class="pm-muted">${esc(p.description||'No description')}</p>
+      <p><b>₹${Number(p.price).toFixed(2)}</b>${Number(p.discount||0)>0?` · Discount ₹${Number(p.discount).toFixed(2)}`:''}</p>
+      <p class="pm-muted">${imgs.length} photo${imgs.length===1?'':'s'} · ${p.active?'Active':'Hidden'}</p>
+      <div class="pm-thumbs">${imgs.slice(0,6).map(u=>`<img class="pm-thumb" src="${esc(u)}" alt="">`).join('')}</div>
+      <div class="pm-actions">
+        <button onclick="openProductEditor(adminProductsData.find(x=>x.id==='${esc(p.id)}'))">Edit</button>
+        <button class="ghost" onclick="deleteProduct('${esc(p.id)}')">Delete</button>
+      </div>
+    </article>`;
+  }).join('')||'<p>No products yet.</p>';
+}
+
+window.adminLogin=adminLogin;window.adminLogout=adminLogout;window.showTab=showTab;window.verifyPayment=verifyPayment;window.rejectPayment=rejectPayment;window.updateOrder=updateOrder;
+window.openProductEditor=openProductEditor;window.closeProductEditor=closeProductEditor;window.removeExistingPhoto=removeExistingPhoto;window.saveProduct=saveProduct;window.deleteProduct=deleteProduct;window.loadProductsAdmin=loadProductsAdmin;
+loadAdmin();
+</script>
+</body>
+</html>
